@@ -295,6 +295,7 @@ try:
         web_search_tool_result_content_ta,
         with_native_memory_tool,
     )
+    from ._output_mode import has_open_object
     from ._request_params import (
         MAX_NON_STREAMING_TOKENS,
         CountTokensArgs,
@@ -1387,6 +1388,16 @@ class AnthropicModel(Model[AsyncAnthropicClient]):
             )
         else:
             mode = super()._default_structured_output_mode(model_settings, model_request_parameters)
+        if (
+            mode == 'native'
+            and model_request_parameters.output_mode == 'auto'
+            and self.profile.get('default_structured_output_mode', 'tool') != 'native'
+            and model_request_parameters.output_object is not None
+            and has_open_object(model_request_parameters.output_object.json_schema)
+        ):
+            # Native Output was picked only so the request can think. It's strict, which would force a `dict`
+            # field to `{}`, so keep Tool Output; an explicit `NativeOutput` or a native profile default keeps it.
+            return 'tool'
         return default_output_mode_within_limits(
             self, mode, model_settings, model_request_parameters, self._strict_schema_limit_exceeded
         )
